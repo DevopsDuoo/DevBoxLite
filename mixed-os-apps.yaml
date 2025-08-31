@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linux-nginx
+  labels:
+    app: linux-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: linux-app
+  template:
+    metadata:
+      labels:
+        app: linux-app
+    spec:
+      nodeSelector:
+        nodepool: linux
+      containers:
+      - name: nginx
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: linux-service
+  labels:
+    app: linux-app
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+    protocol: TCP
+  selector:
+    app: linux-app
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: windows-sim-app
+  labels:
+    app: windows-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: windows-app
+  template:
+    metadata:
+      labels:
+        app: windows-app
+    spec:
+      nodeSelector:
+        nodepool: windows-sim
+      tolerations:
+      - key: "os"
+        operator: "Equal"
+        value: "windows-sim"
+        effect: "NoSchedule"
+      containers:
+      - name: windows-sim-web
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        env:
+        - name: NGINX_PORT
+          value: "80"
+        volumeMounts:
+        - name: html-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: html-content
+        configMap:
+          name: windows-sim-html
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: windows-sim-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Windows-Sim Application</title>
+        <style>
+            body { font-family: Arial; background: #f0f8ff; padding: 20px; }
+            .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; }
+            h1 { color: #0078d4; }
+            .info { background: #e6f3ff; padding: 15px; border-left: 4px solid #0078d4; margin: 15px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🪟 Windows-Simulation Application</h1>
+            <div class="info">
+                <p><strong>Status:</strong> Running Successfully!</p>
+                <p><strong>Node Type:</strong> Windows-Simulation</p>
+                <p><strong>Scheduler:</strong> Kubernetes</p>
+                <p><strong>Port:</strong> 80 (NodePort: 30090)</p>
+            </div>
+            <hr>
+            <h3>📋 Deployment Details:</h3>
+            <ul>
+                <li><strong>NodeSelector:</strong> nodepool=windows-sim</li>
+                <li><strong>Toleration:</strong> os=windows-sim:NoSchedule</li>
+                <li><strong>Container:</strong> nginx:alpine (Windows simulation)</li>
+                <li><strong>Service Type:</strong> NodePort</li>
+            </ul>
+            <hr>
+            <p><small>✅ This app is running on the Windows-simulation node in your mixed-OS Kubernetes cluster!</small></p>
+        </div>
+    </body>
+    </html>
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: windows-sim-service
+  labels:
+    app: windows-app
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30090
+    protocol: TCP
+  selector:
+    app: windows-app
